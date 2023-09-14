@@ -5,37 +5,45 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.*;
 
-public class Server {
+public class Server implements Runnable {
 
-    public static void main(String[] args) {
-        ServerSocket serverSocket = null;
+    ServerSocket serverSocket;
+    Thread[] threadArr;
 
+    Server(int n) {
         try {
             serverSocket = new ServerSocket(8888);
-
             System.out.println("서버 준비 완료");
-            System.out.println("Port번호: " + serverSocket.getLocalPort());
+        } catch (IOException e) { e.printStackTrace(); }
+        threadArr = new Thread[n];
+    }
 
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
+    public void run() {
         while(true) {
             try {
+                System.out.println(Thread.currentThread().getName() + "대기중");
+                
                 Socket socket = serverSocket.accept();
-                System.out.println(socket.getInetAddress());
-
+                System.out.println(socket.getInetAddress() + "로부터 연결 요청이 들어왔습니다.");
+                
                 OutputStream out = socket.getOutputStream();
                 DataOutputStream dos = new DataOutputStream(out);
 
-                dos.writeUTF("[Server] 연결되었습니다.");
-
+                dos.writeUTF("[Server] Test Message");
+                
                 dos.close();
                 socket.close();
 
             } catch (IOException e) {
                 e.printStackTrace();
             }
+        }
+    }
+
+    public void start() {
+        for(int i = 0; i < threadArr.length; i++) {
+            threadArr[i] = new Thread(this);
+            threadArr[i].start();
         }
     }
 }
