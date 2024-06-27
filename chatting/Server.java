@@ -2,76 +2,81 @@ package chatting;
 
 import java.io.*;
 import java.net.*;
-import java.util.Scanner;
+import java.util.*;
 
 public class Server {
-    public static void main(String[] args) {
-        ServerSocket serverSocket;
+
+    HashMap clients;
+
+    Server() {
+        clients = new HashMap();
+        Collections.synchronizedMap(clients);
+    }
+
+    public void start() {
+        ServerSocket serverSocket = null;
+        Socket socket = null;
+
+        try {
+            serverSocket = new ServerSocket(7777);
+            System.out.println("서버가 시작되었습니다.");
+            while (true) {
+                socket = serverSocket.accept();
+                System.out.println("[" + socket.getInetAddress() + ":" + socket.getPort() + "]" + "에서 접속하였습니다.");
+                ServerReceiver thread = new ServerReceiver(socket);
+                thread.start();
+            }
+        } catch (Exception ignore) {}
+    }
+
+    void sendToAll(String msg) {
+        Iterator it = clients.keySet().iterator();
+        while(it.hasNext()) {
+            try {
+                DataOutputStream out = (DataOutputStream) clients.get(it.next());
+                out.writeUTF(msg);
+            } catch (IOException ignore) {}
+        }
+    }
+
+    class ServerReceiver extends Thread {
         Socket socket;
-        
-        try {
-            serverSocket = new ServerSocket(8888);
-            System.out.println("서버 준비 완료");
+        DataInputStream in;
+        DataOutputStream out;
 
-            socket = serverSocket.accept();
-
-            Sender sender = new Sender(socket);
-            Receiver receiver = new Receiver(socket);
-
-            sender.start();
-            receiver.start();
-        } catch (IOException e) { e.printStackTrace(); }
-    }
-}
-
-class Sender extends Thread {
-    Socket socket;
-    DataOutputStream out;
-    String name;
-
-    public Sender(Socket socket) {
-        this.socket = socket;
-        try {
-            out = new DataOutputStream(socket.getOutputStream());
-            name = socket.getInetAddress() + ": " + socket.getPort() + " ";
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    public void run() {
-        Scanner scanner = new Scanner(System.in);
-        while(out != null) {
+        ServerReceiver(Socket socket) {
+            this.socket = socket;
             try {
-                out.writeUTF(name + scanner.nextLine());
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+                in = new DataInputStream(socket.getInputStream());
+                out = new DataOutputStream(socket.getOutputStream());
+            } catch (IOException ignore) {}
         }
-        scanner.close();
-    }
-}
 
-class Receiver extends Thread {
-    Socket socket;
-    DataInputStream in;
+        public void run() {
+            String name = "";
 
-    public Receiver(Socket socket) {
-        this.socket = socket;
-        try {
-            in = new DataInputStream(socket.getInputStream());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public void run() {
-        while(in != null) {
             try {
-                System.out.println(in.readUTF());
-            } catch (IOException e) {
-                e.printStackTrace();
+                name = in.readUTF();
+                sendToAll("#" + name + "님이 들어오셨습니다.");
+
+                clients.put(name, out);
+                System.out.println("현재 서버 접속자 수는 " + clients.size() + " 입니다.");
+
+                while(in != null) {
+                    sendToAll(in.readUTF());
+                }
+            } catch (IOException ignore) {
+            } finally {
+                sendToAll("#" + name + "님이 나가셨습니다.");
+                clients.remove(name);
+                System.out.println("[" + socket.getInetAddress() + ":" + socket.getPort() + "] 에서 접속을 종료하였습니다.");
+                System.out.println("현재 서버 접속자 수는 + " + clients.size() + " 입니다.");
             }
+
         }
+    }
+
+    public static void main(String[] args) {
+        new Server().start();
     }
 }
